@@ -1,0 +1,135 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/5/CPU.hdl
+/**
+ * The Hack Central Processing unit (CPU).
+ * Parses the binary code in the instruction input and executes it according to the
+ * Hack machine language specification. In the case of a C-instruction, computes the
+ * function specified by the instruction. If the instruction specifies to read a memory
+ * value, the inM input is expected to contain this value. If the instruction specifies
+ * to write a value to the memory, sets the outM output to this value, sets the addressM
+ * output to the target address, and asserts the writeM output (when writeM = 0, any
+ * value may appear in outM).
+ * If the reset input is 0, computes the address of the next instruction and sets the
+ * pc output to that value. If the reset input is 1, sets pc to 0.
+ * Note: The outM and writeM outputs are combinational: they are affected by the
+ * instruction's execution during the current cycle. The addressM and pc outputs are
+ * clocked: although they are affected by the instruction's execution, they commit to
+ * their new values only in the next cycle.
+ */
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+        ALU(x=dout, y=toalu,
+            zx=instruction[11], nx=instruction[10],
+            zy=instruction[9], ny=instruction[8],
+            f=instruction[7], no=instruction[6],
+            out=aluout, out=outM,
+            zr=zero, ng=negative);
+        
+        // register loading and memory write logic
+        DMux8Way(in=true, sel=instruction[3..5],
+                 a=ground0,
+                 b=towritem,
+                 c=todreg,
+                 d=todwritem, 
+                 e=dmtoareg,
+                 f=toawritem,
+                 g=toad,
+                 h=toadwritem);
+        
+        // d register
+        Or8Way(in[0]=todreg,
+               in[1]=todwritem,
+               in[2]=toad,
+               in[3]=toadwritem,
+               in[4..7]=false,
+               out=drlpartial);
+        And(a=drlpartial, b=instruction[15], out=dregload); // load if c-ins
+        DRegister(in=aluout, load=dregload, out=dout);
+
+        Mux16(a=instruction, b=aluout, sel=instruction[15], out=toareg);
+        
+        // a register
+        Not(in=instruction[15], out=opcode);
+        Or8Way(in[0]=dmtoareg,
+               in[1]=toawritem,
+               in[2]=toad,
+               in[3]=toadwritem,
+               in[4]=opcode,
+               in[5..7]=false,
+               out=aregload);
+        ARegister(in=toareg,
+                 load=aregload,
+                 out=aout, out[0..14]=addressM);
+        Not(in=instruction[12], out=NOTins12);
+        Mux16(a=inM, b=aout, sel=NOTins12, out=toalu);
+
+        // program counter logic
+        DMux8Way(in=true, sel=instruction[0..2],
+                 a=ground1,
+                 b=jgtlogic,
+                 c=jeqlogic,
+                 d=jgelogic,
+                 e=jltlogic,
+                 f=jnelogic,
+                 g=jlelogic,
+                 h=jmplogic);
+        
+        Nor(a=zero, b=negative , out=zrNORng);
+        And(a=jgtlogic, b=zrNORng, out=jgt);
+
+        Not(in=negative, out=NOTng);
+        And(a=zero, b=NOTng, out=zrANDNOTng);
+        And(a=jeqlogic, b=zrANDNOTng, out=jeq);
+
+        And(a=jgelogic, b=NOTng, out=jge);
+
+        Not(in=zero, out=NOTzr);
+        And(a=NOTzr, b=negative, out=NOTzrANDng);
+        And(a=jltlogic, b=NOTzrANDng, out=jlt);
+
+        And(a=jnelogic, b=NOTzr, out=jne);
+
+        Xor(a=zero, b=negative, out=zrXORng);
+        And(a=jlelogic, b=zrXORng, out=jle);
+
+        Nand(a=zero, b=negative, out=zrNANDng);
+        And(a=jmplogic, b=zrNANDng, out=jmp);
+
+        Or8Way(in[0]=false,
+               in[1]=jgt,
+               in[2]=jeq,
+               in[3]=jge,
+               in[4]=jlt,
+               in[5]=jne,
+               in[6]=jle,
+               in[7]=jmp,
+               
+               out=pclpartial);
+        And(a=pclpartial, b=instruction[15], out=pcload);
+        
+        PC(in=aout, load=pcload, inc=true, reset=reset,
+           out[0..14]=pc);
+        
+        // memory write logic
+        Or8Way(in[0]=towritem,
+               in[1]=todwritem,
+               in[2]=toawritem,
+               in[3]=toadwritem,
+               in[4..7]=false,
+               out=wMpartial);
+        And(a=wMpartial, b=instruction[15], out=writeM); // write if c-ins
+}
