@@ -68,6 +68,5 @@ CHIP ALU {
         // zero check
         Or8Way(in=negresLO, out=zrLO);
         Or8Way(in=negresHI, out=zrHI);
-        Or(a=zrLO, b=zrHI, out=zrlORzrh);
-        Not(in=zrlORzrh, out=zr);
+        Nor(a=zrLO, b=zrHI, out=zr);
 }
