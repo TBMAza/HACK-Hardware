@@ -30,6 +30,6 @@ You can find all official specifications, hardware definitions, machine language
 - **Schematics** generated using [Pranav Jain's Nand2Tetris HDL Visualizer](https://marketplace.visualstudio.com/items?itemName=PranavJain.nand2tetris-hdl-visualizer) for VSCode — many thanks!
 - Based on the *Nand2Tetris* course and book: *The Elements of Computing Systems* by Noam Nisan and Shimon Schocken
 
-## 🖋️ Signed,
+## Author
 
 **A. Asaduz**
